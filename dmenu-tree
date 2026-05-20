@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("Missing dependency: PyYAML")
+    print("Install it with: pip install pyyaml")
+    sys.exit(1)
+
+
+def run_launcher(options, prompt="Menu", launcher="rofi"):
+    """
+    Show menu options using rofi or dmenu and return selected item.
+    """
+    menu_text = "\n".join(options)
+
+    if launcher == "rofi":
+        cmd = ["rofi", "-dmenu", "-p", prompt]
+    elif launcher == "dmenu":
+        cmd = ["dmenu", "-p", prompt]
+    else:
+        print(f"Unsupported launcher: {launcher}")
+        sys.exit(1)
+
+    try:
+        result = subprocess.run(
+            cmd,
+            input=menu_text,
+            text=True,
+            capture_output=True,
+            check=False
+        )
+    except FileNotFoundError:
+        print(f"Launcher not found: {launcher}")
+        sys.exit(1)
+
+    selected = result.stdout.strip()
+
+    if result.returncode != 0 or not selected:
+        return None
+
+    return selected
+
+
+def execute_command(command):
+    """
+    Execute the selected command.
+    """
+    subprocess.Popen(command, shell=True)
+
+
+def open_menu(menu, prompt="Menu", launcher="rofi"):
+    """
+    Recursively open nested menus.
+    """
+    if not isinstance(menu, dict):
+        print("Invalid menu format. Expected a YAML object.")
+        sys.exit(1)
+
+    options = list(menu.keys())
+
+    while True:
+        selected = run_launcher(options, prompt=prompt, launcher=launcher)
+
+        if selected is None:
+            return
+
+        if selected not in menu:
+            return
+
+        value = menu[selected]
+
+        if value is None:
+          return
+
+        if isinstance(value, dict):
+            open_menu(value, prompt=selected, launcher=launcher)
+            return
+
+        elif isinstance(value, str):
+            execute_command(value)
+            return
+
+        else:
+            print(f"Invalid value for menu item: {selected}")
+            return
+
+
+def load_yaml(path):
+    """
+    Load YAML menu file.
+    """
+    file_path = Path(path)
+
+    if not file_path.exists():
+        print(f"File not found: {file_path}")
+        sys.exit(1)
+
+    with file_path.open("r", encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+
+    if data is None:
+        print("YAML file is empty.")
+        sys.exit(1)
+
+    return data
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Simple nested YAML menu wrapper for rofi/dmenu."
+    )
+
+    parser.add_argument(
+        "file",
+        help="Path to YAML menu file"
+    )
+
+    parser.add_argument(
+        "--launcher",
+        choices=["rofi", "dmenu"],
+        default="rofi",
+        help="Menu launcher to use. Default: rofi"
+    )
+
+    parser.add_argument(
+        "--prompt",
+        default="Menu",
+        help="Prompt title for the first menu. Default: Menu"
+    )
+
+    args = parser.parse_args()
+
+    menu = load_yaml(args.file)
+    open_menu(menu, prompt=args.prompt, launcher=args.launcher)
+
+
+if __name__ == "__main__":
+    main()
