@@ -5,13 +5,14 @@ import subprocess
 import sys
 from pathlib import Path
 
+VERSION = "0.1.0"
+
 try:
     import yaml
 except ImportError:
     print("Missing dependency: PyYAML")
     print("Install it with: pip install pyyaml")
     sys.exit(1)
-
 
 def run_launcher(options, prompt="Menu", launcher="rofi"):
     """
@@ -119,6 +120,12 @@ def main():
     parser.add_argument(
         "file",
         help="Path to YAML menu file"
+    )
+
+    parser.add_argument(
+      "--version",
+      action="version",
+      version=f"dm-tree {VERSION}"
     )
 
     parser.add_argument(
